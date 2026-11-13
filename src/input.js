@@ -1,11 +1,11 @@
-export const keys = { w: false, a: false, s: false, d: false, shift: false, e: false, 1: false, 2: false, 3: false, 4: false, 5: false };
+export const keys = { w: false, a: false, s: false, d: false, shift: false, e: false, 1: false, 2: false, 3: false, 4: false, 5: false, r: false };
 export const mouse = { left: false, right: false };
-export const justPressed = { e: false };
+export const justPressed = { e: false, r: false };
 
 window.addEventListener('keydown', (e) => {
     let k = e.key.toLowerCase();
     if (keys.hasOwnProperty(k)) {
-        if (!keys[k] && k === 'e') justPressed.e = true;
+        if (!keys[k] && justPressed.hasOwnProperty(k)) justPressed[k] = true;
         keys[k] = true;
     }
 });

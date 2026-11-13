@@ -1,3 +1,5 @@
+import { loadAnimations } from '../assets.js';
+
 class Enemy {
     constructor(x, y, type = 'slime') {
         this.x = x; this.y = y;
@@ -22,10 +24,7 @@ class Enemy {
             death:  { src: 'assets/images/Slime1_Death_with_shadow.png', frames: 10, speed: 0.1 }
         };
 
-        for (let k in this.animations) {
-            this.animations[k].img = new Image();
-            this.animations[k].img.src = this.animations[k].src;
-        }
+        loadAnimations(this.animations);
     }
 
     takeDamage(amount) {
@@ -48,6 +47,13 @@ class Enemy {
         if (this.attackCooldown > 0) this.attackCooldown -= deltaTime;
 
         if (this.state === 'death' || this.state === 'hurt') {
+            this.animate(deltaTime);
+            return;
+        }
+
+        // Stop chasing/attacking once the player is down
+        if (player.state === 'death') {
+            this.changeState('idle');
             this.animate(deltaTime);
             return;
         }
