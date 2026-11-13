@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HD-2D Prototype</title>
+    <style>
+        :root {
+            --wood: rgba(46, 33, 22, 0.88);
+            --wood-edge: #6b5138;
+            --gold: #ffd700;
+            --text: #f3ead8;
+        }
+        body { margin: 0; overflow: hidden; background: #a9d6ee; font-family: 'Courier New', Courier, monospace; color: var(--text); user-select: none; }
+        canvas { display: block; }
+        .hidden { display: none !important; }
+
+        #ui { position: fixed; inset: 0; pointer-events: none; }
+
+        /* Health / stamina */
+        #stats { position: absolute; top: 16px; left: 16px; display: flex; flex-direction: column; gap: 6px;
+                 padding: 10px 12px; background: var(--wood); border: 3px solid var(--wood-edge); border-radius: 4px; }
+        .stat { display: flex; align-items: center; gap: 8px; }
+        .stat-label { width: 22px; font-weight: bold; font-size: 13px; }
+        .bar { position: relative; width: 180px; height: 16px; background: #1b1410; border: 2px solid #120d09; overflow: hidden; }
+        .fill { height: 100%; transition: width 0.15s; }
+        .fill.hp { background: linear-gradient(#e0574a, #b03228); }
+        .fill.sp { background: linear-gradient(#f5d547, #d4a90f); transition: width 0.05s; }
+        .fill.sp.exhausted { background: linear-gradient(#9a8f6a, #6e6548); } /* greyed out until 30% */
+        .bar-text { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+                    font-size: 11px; font-weight: bold; text-shadow: 1px 1px 0 #000; }
+
+        #help { position: absolute; top: 16px; right: 16px; padding: 6px 10px; background: rgba(0, 0, 0, 0.5);
+                font-size: 12px; border-radius: 4px; line-height: 1.5; text-align: right; }
+
+        /* Hotbar and backpack slots */
+        #hotbar { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px;
+                  padding: 8px; background: var(--wood); border: 3px solid var(--wood-edge); border-radius: 4px; pointer-events: auto; }
+        .slot { position: relative; width: 52px; height: 52px; background: rgba(20, 14, 9, 0.7); border: 3px solid #4a3828;
+                box-sizing: border-box; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        .slot.active { border-color: var(--gold); box-shadow: 0 0 10px var(--gold); }
+        .slot.drop-target { border-color: #7bed9f; }
+        .slot img { width: 36px; height: 36px; object-fit: contain; image-rendering: pixelated; cursor: grab; }
+        .key-label { position: absolute; top: 1px; left: 3px; font-size: 10px; color: #cbbfa8; }
+        .count { position: absolute; bottom: 1px; right: 3px; font-size: 12px; font-weight: bold; text-shadow: 1px 1px 0 #000; }
+
+        #item-label { position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); padding: 4px 12px;
+                      background: rgba(0, 0, 0, 0.8); color: var(--gold); border: 1px solid var(--gold); border-radius: 4px;
+                      font-size: 14px; opacity: 0; transition: opacity 0.4s; white-space: nowrap; }
+
+        #backpack { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -60%); padding: 12px 14px;
+                    background: var(--wood); border: 3px solid var(--wood-edge); border-radius: 4px; pointer-events: auto; }
+        .panel-title { text-align: center; font-weight: bold; letter-spacing: 3px; color: var(--gold); margin-bottom: 10px; }
+        #backpack-grid { display: grid; grid-template-columns: repeat(5, 52px); gap: 6px; }
+        .panel-hint { margin-top: 10px; font-size: 11px; text-align: center; color: #cbbfa8; }
+
+        /* Floating damage / pickup text, positioned from 3D each frame */
+        #float-layer { position: absolute; inset: 0; overflow: hidden; }
+        .float-text { position: absolute; left: 0; top: 0; font: bold 18px Arial, sans-serif; text-shadow: 1px 1px 0 #000, -1px -1px 0 #000; white-space: nowrap; }
+
+        #game-over { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+                     background: rgba(0, 0, 0, 0.6); }
+        #game-over h1 { margin: 0; font-size: 56px; color: #c0392b; letter-spacing: 4px; }
+        #game-over p { font-size: 18px; }
+    </style>
+</head>
+<body>
+    <div id="ui">
+        <div id="stats">
+            <div class="stat"><span class="stat-label">HP</span><div class="bar"><div id="hp-fill" class="fill hp"></div><span id="hp-text" class="bar-text"></span></div></div>
+            <div class="stat"><span class="stat-label">SP</span><div class="bar"><div id="sp-fill" class="fill sp"></div></div></div>
+        </div>
+        <div id="help">
+            WASD move &middot; Shift run<br>
+            Click use item &middot; 1-5 / wheel select<br>
+            E backpack &middot; F effects: <span id="fx-state">on</span>
+        </div>
+        <div id="float-layer"></div>
+        <div id="item-label"></div>
+        <div id="hotbar"></div>
+        <div id="backpack" class="hidden">
+            <div class="panel-title">BACKPACK</div>
+            <div id="backpack-grid"></div>
+            <div class="panel-hint">Drag items between slots and the hotbar &middot; E to close</div>
+        </div>
+        <div id="game-over" class="hidden">
+            <h1>YOU DIED</h1>
+            <p>Press R to restart</p>
+        </div>
+    </div>
+    <script type="module" src="src/hd2d/main.js"></script>
+</body>
+</html>
