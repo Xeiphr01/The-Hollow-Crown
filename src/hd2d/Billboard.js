@@ -4,16 +4,26 @@ import * as THREE from 'three';
 // Sheets are grids of square frames; rows are directions (0 down, 1 left, 2 right, 3 up).
 
 const sheets = new Map();
+const images = new Map();
 const camDir = new THREE.Vector3();
 
+// Each layer file is fetched once, however many sheets stack it
 function loadImage(src) {
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error(`Failed to load ${src}`));
-        img.src = src;
-    });
+    if (!images.has(src)) {
+        images.set(src, new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = () => reject(new Error(`Failed to load ${src}`));
+            img.src = src;
+        }));
+    }
+    return images.get(src);
 }
+
+export const hasSheet = (key) => sheets.has(key);
+
+// The composited canvas behind a sheet (used for dialogue portraits)
+export const sheetCanvas = (key) => sheets.get(key).image;
 
 /**
  * Stack layer images (body, armor, hair, weapon...) into one sheet texture stored under `key`.
@@ -44,8 +54,9 @@ export class Billboard {
      * @param ppu    sprite pixels per world unit
      * @param feetPx pixel row (from the top of a frame) where the feet touch the ground
      * @param silhouette draw a dark outline of the sprite when something is in front of it
+     * @param scale  draw bigger or smaller than the sheet's pixel size (bosses)
      */
-    constructor(anims, { ppu = 72, feetPx = 123, silhouette = false } = {}) {
+    constructor(anims, { ppu = 72, feetPx = 123, silhouette = false, scale = 1 } = {}) {
         this.anims = {};
         for (const [name, a] of Object.entries(anims)) {
             // Each billboard needs its own texture copy (shared image) to show its own frame
@@ -57,9 +68,9 @@ export class Billboard {
 
         const first = Object.values(this.anims)[0].tex;
         const frame = first.userData.frame;
-        const size = frame / ppu;
+        const size = (frame / ppu) * scale;
         // Shift the quad up so the feet sit exactly on the object's origin
-        const geo = new THREE.PlaneGeometry(size, size).translate(0, (feetPx - frame / 2) / ppu, 0);
+        const geo = new THREE.PlaneGeometry(size, size).translate(0, ((feetPx - frame / 2) / ppu) * scale, 0);
         this.mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: first, alphaTest: 0.5, side: THREE.DoubleSide }));
         this.mesh.customDepthMaterial = new THREE.MeshDepthMaterial({
             depthPacking: THREE.RGBADepthPacking, map: first, alphaTest: 0.5,
@@ -85,6 +96,22 @@ export class Billboard {
     }
 
     get position() { return this.mesh.position; }
+
+    // Point every animation at a different sheet with the same layout (e.g. new equipment)
+    setSheet(key) {
+        for (const a of Object.values(this.anims)) {
+            a.tex.dispose();
+            a.tex = sheets.get(key).clone();
+            const { cols, rows } = a.tex.userData;
+            a.tex.repeat.set(1 / cols, 1 / rows);
+            a.sheet = key;
+        }
+        const name = this.current;
+        this.current = null;
+        const { frame, timer } = this;
+        this.play(name);
+        Object.assign(this, { frame, timer });
+    }
 
     play(name, restart = false) {
         if (this.current === name && !restart) return;

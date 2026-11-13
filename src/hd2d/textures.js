@@ -79,3 +79,34 @@ export const grassBlades = (flowers) => makeTexture(16, 16, flowers ? 21 : 13, (
         }
     }
 });
+
+// --- Dungeon ----------------------------------------------------------------------
+// Worn flagstones: a 2x2 grid of slabs with dark grout
+export const flagstone = (tint = [120, 122, 130]) => makeTexture(16, 16, 17 + tint[0], (g, w, h, r) => {
+    g.fillStyle = '#2a2a30';
+    g.fillRect(0, 0, w, h);
+    for (const [x, y] of [[0, 0], [8, 0], [0, 8], [8, 8]]) {
+        const v = Math.floor(r() * 18) - 9;
+        g.fillStyle = `rgb(${tint[0] + v}, ${tint[1] + v}, ${tint[2] + v})`;
+        g.fillRect(x + 1, y + 1, 7, 7);
+        g.fillStyle = `rgba(0, 0, 0, 0.18)`;
+        for (let i = 0; i < 4; i++) g.fillRect(x + 1 + Math.floor(r() * 7), y + 1 + Math.floor(r() * 7), 1, 1);
+    }
+});
+
+// Brick wall face; `rows` of bricks per texture so tall walls keep square pixels
+export const dungeonBrick = (tint = [96, 98, 110], h = 16) => makeTexture(16, h, 23 + tint[1] + h, (g, w, hh, r) => {
+    g.fillStyle = '#1e1e24';
+    g.fillRect(0, 0, w, hh);
+    for (let row = 0, y = 0; y < hh; row++, y += 4) {
+        for (let x = row % 2 ? -4 : 0; x < w; x += 8) {
+            const v = Math.floor(r() * 22) - 11;
+            g.fillStyle = `rgb(${tint[0] + v}, ${tint[1] + v}, ${tint[2] + v})`;
+            g.fillRect(x + 1, y + 1, 7, 3);
+        }
+    }
+});
+
+// Packed earth with pebbles (goblin warrens)
+export const earth = () => makeTexture(16, 16, 29, (g, w, h, r) =>
+    speckle(g, w, h, r, '#5a4632', ['#4d3b29', '#665039', '#7a6a55', '#3f3122'], 0.4));
